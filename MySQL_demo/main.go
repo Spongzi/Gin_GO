@@ -120,6 +120,79 @@ func deleteRowDemo() {
 	fmt.Printf("delete success, delete id = %v\n", rowsAffected)
 }
 
+// 预处理查询, 批量执行同一条sql语句的时候
+func prepareQueryDemo() {
+	sqlStr := "select id, name, age from USER where id > ? ;"
+	stmt, err := db.Prepare(sqlStr)
+	if err != nil {
+		fmt.Println("prepare failed!", err)
+		return
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(0)
+	if err != nil {
+		fmt.Println("query failed", err)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var u user
+		err := rows.Scan(&u.id, &u.name, &u.age)
+		if err != nil {
+			fmt.Println("scan failed", err)
+			return
+		}
+		fmt.Printf("id=%v, name=%v, age=%v\n", u.id, u.name, u.age)
+	}
+}
+
+// 预处理插入
+func prepareInsertRowDemo() {
+	sqlStr := "insert into USER (name, age) values (?, ?);"
+	stmt, err := db.Prepare(sqlStr)
+	if err != nil {
+		panic(err)
+		return
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec("王五", 19)
+	if err != nil {
+		panic(err)
+		return
+	}
+	fmt.Printf("插入成功\n")
+}
+
+// 转账的事物处理
+func transactionDemo() {
+	tx, err := db.Begin() // 开启事物
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			fmt.Println("roll back failed!", err)
+			return
+		}
+		return
+	}
+	sqlStr1 := "update USER set age=10 where id = ?;"
+	_, err = tx.Exec(sqlStr1, 2)
+	if err != nil {
+		fmt.Println("exec sqlStr1 failed", err)
+		panic(tx.Rollback())
+	}
+	sqlStr2 := "update USER set age = 30 where id = ?;"
+	_, err = tx.Exec(sqlStr2, 4)
+	if err != nil {
+		fmt.Println("exec sqlStr2 failed", err)
+		panic(tx.Rollback())
+	}
+	err = tx.Commit()
+	if err != nil {
+		fmt.Println("commit failed", err)
+		panic(tx.Rollback())
+	}
+	fmt.Println("success!!!")
+}
 func main() {
 	err := initMySql()
 	if err != nil {
@@ -142,6 +215,15 @@ func main() {
 	deleteRowDemo()
 	// 多个查询
 	queryMultiRowDemo()
+	// 分割线
+	fmt.Println("=============")
+	// 预插入
+	prepareInsertRowDemo()
+	// 预查询
+	prepareQueryDemo()
+	// 分割线
+	fmt.Println("============")
+	transactionDemo()
 }
 
 // 10个视频！！！
